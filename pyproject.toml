@@ -4,20 +4,31 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rlc-python"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Python port of the RLdev Kepago compiler for RealLive"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { file = "LICENSE" }
+license = "GPL-2.0-or-later"
+license-files = ["LICENSE", "LICENSES/*", "NOTICE"]
 authors = [{ name = "RLDev contributors" }]
+keywords = ["compiler", "kepago", "reallive", "visual-novel"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
-    "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Compilers",
 ]
+
+[project.urls]
+Homepage = "https://github.com/WorkingWarrior/rlc-python"
+Repository = "https://github.com/WorkingWarrior/rlc-python.git"
+Issues = "https://github.com/WorkingWarrior/rlc-python/issues"
 
 [project.scripts]
 rlc = "rlc.main:main"
@@ -27,6 +38,9 @@ dev = ["ruff>=0.13.0,<0.15"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rlc"]
+
+[tool.hatch.version]
+path = "src/rlc/__init__.py"
 
 [tool.ruff]
 line-length = 100

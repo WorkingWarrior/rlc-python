@@ -29,12 +29,19 @@ historical CLI options still need additional differential coverage. See
 
 ## Requirements and installation
 
-Python 3.10 or newer and [uv](https://docs.astral.sh/uv/) are required for the
-development workflow. The compiler itself has no third-party runtime
-dependencies.
+Python 3.10 or newer is required. The compiler has no third-party runtime
+dependencies. Install the current development version directly from GitHub
+with [uv](https://docs.astral.sh/uv/):
 
 ```sh
-git clone <repository-url> rlc-python
+uv tool install git+https://github.com/WorkingWarrior/rlc-python.git
+rlc --version
+```
+
+To work on the project itself:
+
+```sh
+git clone https://github.com/WorkingWarrior/rlc-python.git
 cd rlc-python
 uv sync --dev
 uv run rlc --help
@@ -93,6 +100,7 @@ uv run python -m unittest tests.test_corpus_differential -v
 - `tests/` — self-contained unit/integration tests and optional differential
   suites
 - `COMPATIBILITY.md` — detailed validation record and known limitations
+- `RELEASING.md` — maintainer checklist for tagged GitHub releases
 
 ## Licensing
 

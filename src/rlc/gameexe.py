@@ -81,4 +81,8 @@ def parse_gameexe(source):
 def load_gameexe(path, encoding="cp932"):
     with open(path, "rb") as stream:
         raw = stream.read()
-    return parse_gameexe(raw.decode(encoding))
+    try:
+        source = raw.decode(encoding)
+    except UnicodeDecodeError:
+        source = raw.decode("utf-8-sig")
+    return parse_gameexe(source)

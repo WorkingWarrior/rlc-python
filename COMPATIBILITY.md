@@ -75,14 +75,14 @@ compilable cases and classified the same four rejected inputs.
 
 ## Tests
 
-The standalone suite contains **61 tests**, including two small regressions for
+The standalone suite contains **63 tests**, including two small regressions for
 compressor behaviours that caused differences on real scenarios. The latest
 self-contained run was:
 
 ```text
 uv run python -m unittest discover -s tests -v
 
-Ran 61 tests in 2.793s
+Ran 63 tests in 4.881s
 OK (skipped=18)
 ```
 

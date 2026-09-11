@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 
+from . import __version__
 from .compiler import Compiler
 from .config import Config, TargetPlatform
 from .lexer import Lexer
@@ -30,6 +31,7 @@ def compile_file(filepath: str, config: Config):
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="rlc", description="RealLive-compatible compiler")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     p.add_argument("filepath")
     p.add_argument("-o", "--output")
     p.add_argument("-d", "--outdir", default="")
