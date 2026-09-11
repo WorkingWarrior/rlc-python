@@ -210,7 +210,8 @@ class StringLexer:
             start = self.pos
             start_column = self.column
             while self.pos < len(self.source) and (
-                self.source[self.pos].isalpha() or self.source[self.pos] == "_"
+                (self.source[self.pos].isascii() and self.source[self.pos].isalpha())
+                or self.source[self.pos] == "_"
             ):
                 self.advance()
             code = self.source[start : self.pos]

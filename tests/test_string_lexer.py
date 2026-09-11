@@ -24,6 +24,11 @@ class TestStringLexer(unittest.TestCase):
         self.assertEqual(code[1].value, 3)
         self.assertEqual(code[2][0].value, 7)
 
+    def test_non_ascii_character_after_backslash_is_literal_text(self):
+        program = Parser(Lexer("'\\ｼ'", "text.ke").tokens()).parse()
+        literal = program.statements[0].args[0].value
+        self.assertEqual([(token.kind, token.value) for token in literal.tokens], [("text", "ｼ")])
+
     def test_plain_static_textout_matches_compile_stub_shape(self):
         config = Config(
             kfn_directory_path=str(default_kfn_path()),
