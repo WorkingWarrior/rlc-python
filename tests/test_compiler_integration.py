@@ -38,6 +38,11 @@ class TestCompilerIntegration(unittest.TestCase):
         self.assertIn(b"\\\x1e", data[off:])
         self.assertIn(b"\\\x14", data[off:])
 
+    def test_raw_variable_bank_from_disassembler(self):
+        data = compile_source("VAR07[8] = 96", self.config, "raw_var.ke")
+        off = struct.unpack_from("<I", data, 0x20)[0]
+        self.assertIn(b"$\x07[$\xff\x08\x00\x00\x00]", data[off:])
+
     def test_project_runtime_headers_parse(self):
         from rlc.lexer import Lexer
         from rlc.parser import Parser

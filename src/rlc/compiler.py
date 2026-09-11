@@ -3,6 +3,7 @@
 import copy
 import operator
 import os
+import re
 
 from .config import TargetPlatform
 from .errors import RLCError
@@ -371,6 +372,11 @@ class Compiler:
                 spaces[f"intZ{suffix}"] = offset + 25
             if name in spaces and e.kind == "index":
                 return variable(spaces[name], self.expr(e.args[0]))
+            # Kprl uses VARxx for variable banks that have no symbolic Kepago
+            # name (for example VAR07 for RealLive's allocated H flags).
+            raw_space = re.fullmatch(r"VAR([0-9a-fA-F]{2})", name)
+            if raw_space and e.kind == "index":
+                return variable(int(raw_space.group(1), 16), self.expr(e.args[0]))
             if e.kind == "ident":
                 try:
                     sigs = self.config.symbol_table.lookup_function(name)
