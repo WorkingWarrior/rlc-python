@@ -1,0 +1,13 @@
+RLC Python is a Python port of the RLC compiler from RLdev revision 634b6c5.
+The compiler implementation and the bundled RealLive function database and
+runtime headers are derived from RLdev.
+
+The main compiler and most bundled data are distributed under the GNU General
+Public License, version 2 or later. See LICENSE.
+
+The bundled files src/rlc/data/textout.kh and src/rlc/data/rlBabel.kh are
+distributed under the GNU Lesser General Public License, version 2.1 or later,
+with the special linking exception stated in each file's header. See
+LICENSES/LGPL-2.1-or-later.txt and the header of each file.
+
+Original RLdev copyright notices are retained in the bundled data files.
