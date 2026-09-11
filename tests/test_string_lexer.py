@@ -44,6 +44,16 @@ class TestStringLexer(unittest.TestCase):
         offset = struct.unpack_from("<I", data, 0x20)[0]
         self.assertEqual(data[offset:], b'!\x00\x00@\x01\x00"value=007"\x00')
 
+    def test_static_speaker_marker_does_not_require_closing_brace(self):
+        config = Config(
+            kfn_directory_path=str(default_kfn_path()),
+            target_version=Version(1, 4, 0, 5),
+            include_debug_symbols=False,
+        )
+        data = compile_source("'\\{春原Hello'", config, "text.ke")
+        offset = struct.unpack_from("<I", data, 0x20)[0]
+        self.assertIn(b"\x81\x79", data[offset:])
+
 
 if __name__ == "__main__":
     unittest.main()

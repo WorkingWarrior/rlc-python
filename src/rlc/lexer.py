@@ -136,6 +136,8 @@ class Lexer:
                             "anonymous resource string references not permitted in #res references",
                             loc,
                         )
+                    if key.isdecimal():
+                        key = str(int(key))
                     self._adv()
                     yield Token("RESOURCE_REF", key, loc)
                     continue

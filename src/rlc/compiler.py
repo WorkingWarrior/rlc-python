@@ -425,6 +425,13 @@ class Compiler:
             else:
                 left = self.expr(e.args[0])
                 right = self.expr(e.args[1])
+            # Constant string operands are represented by Literal until they
+            # enter a parameter context.  Comparisons are bytecode expression
+            # contexts too, so encode them before composing the expression.
+            if isinstance(left, Literal):
+                left = parameters([left], encoding=self.config.output_encoding)
+            if isinstance(right, Literal):
+                right = parameters([right], encoding=self.config.output_encoding)
             # Kepago and RealLive bytecode do not share arithmetic operator
             # precedence.  Expr.traverse inserts parentheses using ``prec``
             # from expr.ml (add/sub=10, every other arithmetic op=20).
@@ -455,11 +462,14 @@ class Compiler:
             return binary(left, op, right)
         if e.kind == "unary":
             if e.value == "-":
-                return b"\\\x01" + self.expr(e.args[0])
+                value = self.expr(e.args[0])
+                if isinstance(value, Literal):
+                    value = parameters([value], encoding=self.config.output_encoding)
+                return b"\\\x01" + value
             if e.value == "!":
-                return binary(self.expr(e.args[0]), "==", int32(0))
+                return binary(self._expression_bytes(e.args[0]), "==", int32(0))
             if e.value == "~":
-                return binary(self.expr(e.args[0]), "^", int32(-1))
+                return binary(self._expression_bytes(e.args[0]), "^", int32(-1))
         if e.kind == "call":
             if e.value == "at":
                 if len(e.args) != 3:
@@ -569,6 +579,18 @@ class Compiler:
                     self.return_value = oldret
                     self.inlines[inline_name] = (params, body)
                 return result
+            return_parameter = self._call_return_parameter(e)
+            if return_parameter is not None:
+                if return_parameter.type is RLType.STR:
+                    destination = variable(18, int32(self.next_str))
+                    self.next_str += 1
+                elif return_parameter.type is RLType.INT:
+                    destination = variable(2, int32(self.next_int))
+                    self.next_int += 1
+                else:
+                    self.error(e, f"unsupported return type from `{e.value}'")
+                self.elements.append(self._compile_call(e, destination))
+                return destination
             compiled = self._compile_call(e)
             sigs = self.config.symbol_table.lookup_function(e.value)
             if any("store" in sig.kfn_flags for sig in sigs):
@@ -590,7 +612,9 @@ class Compiler:
                     self.error(e, f"undefined module `{e.value[1]}'")
             values = [self.expr(value) for value in e.args]
             return opcode(op_type, module, code, len(values), overload) + (
-                b"(" + parameters(values) + b")" if values else b""
+                b"(" + parameters(values, encoding=self.config.output_encoding) + b")"
+                if values
+                else b""
             )
         if e.kind == "complex":
             return tuple(self.expr(x) for x in e.args)
@@ -615,8 +639,29 @@ class Compiler:
         if e.kind == "complex":
             return "complex"
         if e.kind == "call":
+            returned = self._call_return_parameter(e)
+            if returned is not None:
+                return "str_var" if returned.type is RLType.STR else "int_expr"
             return "call"
         return "invalid"
+
+    def _call_return_parameter(self, e):
+        """Return the explicit destination parameter for a matching KFN call."""
+        if e.kind != "call" or e.value in self.inlines:
+            return None
+        try:
+            signatures = self.config.symbol_table.lookup_function(e.value)
+        except KeyError:
+            return None
+        for signature in signatures:
+            try:
+                overload = choose_overload(signature, len(e.args))
+            except ValueError:
+                continue
+            prototype = signature.prototypes[overload]
+            if prototype is not None:
+                return next((p for p in prototype if p.is_return_value), None)
+        return None
 
     def _lower_parameter(self, e, p, funcname):
         actual = self._expr_type(e)
@@ -738,7 +783,12 @@ class Compiler:
                 overload = choose_overload(sig, len(e.args))
                 proto = sig.prototypes[overload]
                 if proto is None:
-                    return function(sig, [self.expr(x) for x in e.args], overload)
+                    return function(
+                        sig,
+                        [self.expr(x) for x in e.args],
+                        overload,
+                        encoding=self.config.output_encoding,
+                    )
                 defs = [p for p in proto if not p.is_return_value and not p.is_fake]
                 lowered = []
                 for i, arg in enumerate(e.args):
@@ -754,9 +804,12 @@ class Compiler:
                     return_def = proto[return_index]
                     encoded_index = sum(1 for p in proto[:return_index] if not p.is_fake)
                     lowered.insert(
-                        encoded_index, self._lower_parameter(destination, return_def, e.value)
+                        encoded_index,
+                        destination
+                        if isinstance(destination, bytes)
+                        else self._lower_parameter(destination, return_def, e.value),
                     )
-                return function(sig, lowered, overload)
+                return function(sig, lowered, overload, encoding=self.config.output_encoding)
             except (ValueError, TypeError) as ex:
                 last = ex
         self.error(e, str(last))
@@ -943,7 +996,9 @@ class Compiler:
             if use_text:
                 rendered = self._select_text(text)
                 self.elements.append(
-                    rendered if isinstance(rendered, bytes) else parameters([rendered])
+                    rendered
+                    if isinstance(rendered, bytes)
+                    else parameters([rendered], encoding=self.config.output_encoding)
                 )
             self.elements.append(LineRef(text.location.line, True))
         self.elements.append(b"}")
@@ -966,11 +1021,24 @@ class Compiler:
             # conditional_unit turns ``! value`` into ``value == 0``.  The
             # operand must not first be normalised to ``value != 0`` or the
             # emitted expression gains a second, observable comparison.
-            return binary(self.expr(e.args[0]), "==", int32(0))
-        return binary(self.expr(e), "!=", int32(0))
+            return binary(self._expression_bytes(e.args[0]), "==", int32(0))
+        return binary(self._expression_bytes(e), "!=", int32(0))
+
+    def _expression_bytes(self, e):
+        value = self.expr(e)
+        return (
+            parameters([value], encoding=self.config.output_encoding)
+            if isinstance(value, Literal)
+            else value
+        )
 
     def _named_call(self, name, values, overload=None):
-        return function(self.config.symbol_table.lookup_function(name)[0], values, overload)
+        return function(
+            self.config.symbol_table.lookup_function(name)[0],
+            values,
+            overload,
+            encoding=self.config.output_encoding,
+        )
 
     def _is_string_lvalue(self, e):
         if e.kind in ("ident", "index"):
@@ -1058,7 +1126,6 @@ class Compiler:
         self.elements.append(Kidoku(s.location.line))
         buf = bytearray()
         quoted = False
-        in_name = False
         ignore_space = False
 
         def quote(on):
@@ -1110,16 +1177,12 @@ class Compiler:
             elif token.kind == "hyphen":
                 add_text("-")
             elif token.kind == "speaker":
-                if in_name:
-                    raise RLCError("\\{} may not be nested", token.location)
                 quote(False)
                 buf.extend(b"\x81\x79")
-                in_name = True
             elif token.kind == "rcur":
                 quote(False)
                 buf.extend(b"\x81\x7a")
                 ignore_space = True
-                in_name = False
             elif token.kind == "name":
                 quote(False)
                 scope, args = token.value
@@ -1153,7 +1216,13 @@ class Compiler:
                     last = None
                     for sig in sigs:
                         try:
-                            self.elements.append(function(sig, [self.expr(a) for a in args]))
+                            self.elements.append(
+                                function(
+                                    sig,
+                                    [self.expr(a) for a in args],
+                                    encoding=self.config.output_encoding,
+                                )
+                            )
                             break
                         except ValueError as ex:
                             last = ex
@@ -1163,8 +1232,6 @@ class Compiler:
                 raise RLCError(
                     f"\\{token.kind} resource semantics are not implemented yet", token.location
                 )
-        if in_name:
-            raise RLCError("expected `}' to close name block", s.location)
         flush()
 
     def statement(self, s):
@@ -1330,7 +1397,13 @@ class Compiler:
                     # parameter lowering.  In particular a bare integer must
                     # be encoded as ``integer != 0``.
                     sig = self.config.symbol_table.lookup_function(call.value)[0]
-                    self.elements.append(function(sig, [self._condition(call.args[0])]))
+                    self.elements.append(
+                        function(
+                            sig,
+                            [self._condition(call.args[0])],
+                            encoding=self.config.output_encoding,
+                        )
+                    )
                 else:
                     self.elements.append(self._compile_call(call))
                 self.elements.extend(LabelRef(label) for label in labels)
@@ -1698,6 +1771,8 @@ class Compiler:
                         finish_resource()
                         close = stripped.index(">")
                         pending_key = stripped[1:close]
+                        if pending_key.isdecimal():
+                            pending_key = str(int(pending_key))
                         pending_body = [stripped[close + 1 :].lstrip(" ")]
                     elif pending_key is not None:
                         # strLexer consumes whitespace on both sides of a
@@ -1747,7 +1822,12 @@ class Compiler:
                 return
         sig = self.config.symbol_table.lookup_function(name)[0]
         vals = [] if cond is None else [self._condition(cond)]
-        self.elements.extend((function(sig, vals), LabelRef(label)))
+        self.elements.extend(
+            (
+                function(sig, vals, encoding=self.config.output_encoding),
+                LabelRef(label),
+            )
+        )
 
     def compile(self, program):
         # compilerFrame.ml unconditionally parses the installed system.kh

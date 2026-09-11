@@ -36,6 +36,11 @@ def main(argv=None):
     p.add_argument("-o", "--output")
     p.add_argument("-d", "--outdir", default="")
     p.add_argument("-e", "--encoding", default="CP932")
+    p.add_argument(
+        "--output-encoding",
+        default="CP932",
+        help="byte encoding for text in the compiled scenario (default: CP932)",
+    )
     p.add_argument("-f", "--target-version", default="1.2.7.0")
     p.add_argument("-t", "--target", choices=["RealLive", "Kinetic", "AVG2000"], default="RealLive")
     p.add_argument("--kfn", default=str(default_kfn_path()))
@@ -58,7 +63,7 @@ def main(argv=None):
         target_platform=platform,
         target_version=parse_version_string(a.target_version),
         input_encoding=a.encoding,
-        output_encoding="cp932",
+        output_encoding=a.output_encoding,
         include_debug_symbols=not a.no_debug,
         kfn_directory_path=a.kfn,
         verbose=bool(a.verbose),

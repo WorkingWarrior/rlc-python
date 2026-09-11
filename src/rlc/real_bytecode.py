@@ -85,11 +85,11 @@ class Literal:
     value: str
 
 
-def _parameter(value, previous=None) -> bytes:
+def _parameter(value, previous=None, encoding="cp932") -> bytes:
     if isinstance(value, bytes):
         return value
     if isinstance(value, Literal):
-        raw = value.value.encode("cp932")
+        raw = value.value.encode(encoding)
 
         # StrTokens.unquoted_char operates on characters, not encoded bytes:
         # uppercase ASCII/digits/_/? and every character represented by two
@@ -100,17 +100,17 @@ def _parameter(value, previous=None) -> bytes:
                 "A" <= char <= "Z"
                 or "0" <= char <= "9"
                 or char in "_?"
-                or len(char.encode("cp932")) == 2
+                or len(char.encode(encoding)) == 2
             )
 
         needs = any(not unquoted(char) for char in value.value)
         return (b'"' + raw + b'"') if needs or not raw else raw
     if isinstance(value, str):
-        return value.encode("cp932")
+        return value.encode(encoding)
     if isinstance(value, int):
         return int32(value)
     if isinstance(value, (tuple, list)):
-        return b"(" + parameters(value) + b")"
+        return b"(" + parameters(value, encoding=encoding) + b")"
     if isinstance(value, Special):
         if value.ident > 255:
             prefix = (
@@ -118,16 +118,16 @@ def _parameter(value, previous=None) -> bytes:
             )
         else:
             prefix = b"a" + bytes((value.ident,))
-        body = parameters(value.values)
+        body = parameters(value.values, encoding=encoding)
         return prefix + body if value.no_parens else prefix + b"(" + body + b")"
     raise TypeError(f"unsupported RealLive parameter: {type(value).__name__}")
 
 
-def parameters(values) -> bytes:
+def parameters(values, encoding="cp932") -> bytes:
     out = bytearray()
     previous = None
     for value in values:
-        encoded = _parameter(value, previous)
+        encoded = _parameter(value, previous, encoding)
         # OCaml inserts separators only in the few ambiguous cases.  Literal
         # strings are represented as str here; raw expression bytes are not.
         if out and isinstance(value, Literal) and isinstance(previous, Literal):
@@ -168,13 +168,15 @@ def choose_overload(func: FunctionSignature, argc: int) -> int:
     raise ValueError(f"unable to find a prototype for `{func.name}' that matches these parameters")
 
 
-def function(func: FunctionSignature, values, overload: Optional[int] = None) -> bytes:
+def function(
+    func: FunctionSignature, values, overload: Optional[int] = None, encoding="cp932"
+) -> bytes:
     idx = choose_overload(func, len(values)) if overload is None else overload
     argc = len(values)
     if func.prototypes and func.prototypes[idx] is not None:
         argc -= sum(1 for p in func.prototypes[idx] if p.is_uncounted)
     head = opcode(func.opcode_type, func.module_id or 0, func.id or 0, argc, idx)
-    return head + (b"(" + parameters(values) + b")" if values else b"")
+    return head + (b"(" + parameters(values, encoding=encoding) + b")" if values else b"")
 
 
 @dataclass(frozen=True)

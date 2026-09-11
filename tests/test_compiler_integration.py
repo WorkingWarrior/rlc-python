@@ -1,6 +1,8 @@
 import os
 import struct
+import tempfile
 import unittest
+from pathlib import Path
 
 from rlc.config import Config
 from rlc.errors import RLCError
@@ -115,6 +117,19 @@ pause()
         special = compile_source("gosub_with({1})", self.config)
         off = struct.unpack_from("<I", special, 0x20)[0]
         self.assertIn(b"a\x00$\xff\x01\x00\x00\x00", special[off:])
+
+    def test_string_returning_calls_can_be_nested(self):
+        source = """strout(strsub(GetName(1), 0, 1))
+goto_unless(GetLocalName(0) == 'Nagisa') @done
+@done"""
+        self.assertEqual(compile_source(source, self.config, "strings.ke")[:4], b"KPRL")
+
+    def test_numeric_resource_keys_ignore_leading_zeroes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            resource = Path(directory) / "strings.utf"
+            resource.write_text("<0142> resource text\n", encoding="utf-8")
+            source = f"#resource '{resource}' #res<142>"
+            self.assertEqual(compile_source(source, self.config, "resource.ke")[:4], b"KPRL")
 
     def test_select_variants_conditions_and_result_store(self):
         source = "int choice choice = select_w2[3]('ONE', colour: 'Red', grey(2) if intA[0]: 'X')"

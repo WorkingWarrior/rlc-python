@@ -60,6 +60,12 @@ and `-d` to select the output directory. `--kfn` can override the bundled
 `reallive.kfn`; `-i` supplies a GAMEEXE.INI file. Run `uv run rlc --help` for the
 complete supported option set.
 
+Text is encoded as CP932 by default, matching standard RealLive. Ports or
+modified interpreters that support another byte encoding can select it with
+`--output-encoding`, for example `--output-encoding UTF-8`. This changes the
+bytes stored in string literals; the target interpreter must decode those bytes
+using the same encoding.
+
 ## Tests
 
 The standard suite is self-contained:

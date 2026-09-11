@@ -29,6 +29,27 @@ class TestCli(unittest.TestCase):
                 int.from_bytes((root / "packed.TXT").read_bytes()[:4], "little"), 0x1D0
             )
 
+    def test_utf8_output_encoding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            source = root / "input.ke"
+            source.write_text("'Zażółć gęślą jaźń'\n", encoding="utf-8")
+            main(
+                [
+                    str(source),
+                    "-e",
+                    "UTF-8",
+                    "--output-encoding",
+                    "UTF-8",
+                    "-u",
+                    "-g",
+                    "--no-metadata",
+                    "-o",
+                    str(root / "utf8.ke"),
+                ]
+            )
+            self.assertIn("Zażółć gęślą jaźń".encode(), (root / "utf8.TXT.rl").read_bytes())
+
 
 if __name__ == "__main__":
     unittest.main()
