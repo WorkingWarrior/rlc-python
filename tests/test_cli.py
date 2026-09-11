@@ -1,6 +1,7 @@
 import contextlib
 import io
 import pathlib
+import struct
 import tempfile
 import unittest
 
@@ -49,6 +50,27 @@ class TestCli(unittest.TestCase):
                 ]
             )
             self.assertIn("Zażółć gęślą jaźń".encode(), (root / "utf8.TXT.rl").read_bytes())
+
+    def test_archive_mode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            source = root / "input.ke"
+            source.write_bytes(b"#entrypoint 0\npause()\n")
+            first = root / "SEEN0042.TXT"
+            second = root / "SEEN0007.TXT"
+            common = [str(source), "-g", "--no-metadata", "-f", "1.4.0.5"]
+            main(common + ["-o", str(first.with_suffix(""))])
+            main(common + ["-o", str(second.with_suffix(""))])
+
+            archive = root / "Seen.txt"
+            main(["-a", str(archive), str(first), str(second)])
+            data = archive.read_bytes()
+            offset_7, length_7 = struct.unpack_from("<II", data, 7 * 8)
+            offset_42, length_42 = struct.unpack_from("<II", data, 42 * 8)
+            self.assertEqual(offset_7, 80_000)
+            self.assertEqual(offset_42, offset_7 + length_7)
+            self.assertEqual(data[offset_7 : offset_7 + length_7], second.read_bytes())
+            self.assertEqual(data[offset_42 : offset_42 + length_42], first.read_bytes())
 
 
 if __name__ == "__main__":

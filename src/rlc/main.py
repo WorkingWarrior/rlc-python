@@ -3,8 +3,10 @@
 import argparse
 import logging
 import os
+from pathlib import Path
 
 from . import __version__
+from .archive import pack_seen_archive
 from .compiler import Compiler
 from .config import Config, TargetPlatform
 from .lexer import Lexer
@@ -32,7 +34,13 @@ def compile_file(filepath: str, config: Config):
 def main(argv=None):
     p = argparse.ArgumentParser(prog="rlc", description="RealLive-compatible compiler")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    p.add_argument("filepath")
+    p.add_argument("filepath", nargs="+")
+    p.add_argument(
+        "-a",
+        "--archive",
+        metavar="SEEN.TXT",
+        help="pack compressed SEENxxxx.TXT files into one RealLive archive",
+    )
     p.add_argument("-o", "--output")
     p.add_argument("-d", "--outdir", default="")
     p.add_argument("-e", "--encoding", default="CP932")
@@ -54,6 +62,12 @@ def main(argv=None):
     p.add_argument("-v", "--verbose", action="count", default=0)
     a = p.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if a.verbose else logging.INFO)
+    if a.archive:
+        pack_seen_archive((Path(filepath) for filepath in a.filepath), Path(a.archive))
+        return 0
+    if len(a.filepath) != 1:
+        p.error("compilation accepts exactly one source file")
+    filepath = a.filepath[0]
     platform = {
         "RealLive": TargetPlatform.GENERIC_REALLIVE,
         "Kinetic": TargetPlatform.KINETIC,
@@ -71,8 +85,8 @@ def main(argv=None):
         compiler_version=a.compiler,
         gameexe_path=a.gameexe,
     )
-    data = compile_file(a.filepath, c)
-    base = os.path.splitext(a.output or os.path.basename(a.filepath))[0]
+    data = compile_file(filepath, c)
+    base = os.path.splitext(a.output or os.path.basename(filepath))[0]
     dest = os.path.join(a.outdir, base + (".TXT.rl" if a.uncompressed else ".TXT"))
     os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
     with open(dest, "wb") as output_file:

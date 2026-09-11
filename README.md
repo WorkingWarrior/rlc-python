@@ -60,6 +60,17 @@ and `-d` to select the output directory. `--kfn` can override the bundled
 `reallive.kfn`; `-i` supplies a GAMEEXE.INI file. Run `uv run rlc --help` for the
 complete supported option set.
 
+Pack already compiled scenarios into a single RealLive archive with `-a`:
+
+```sh
+uv run rlc -a Seen.txt build/scenarios/SEEN????.TXT
+```
+
+The inputs must be compressed RealLive bytecode named `SEENxxxx.TXT`. The
+archive is written atomically and uses the same 10,000-entry index layout as
+RLDev's `kprl -a` operation. If `Seen.txt` already exists, entries not replaced
+by an input file are retained.
+
 Text is encoded as CP932 by default, matching standard RealLive. Ports or
 modified interpreters that support another byte encoding can select it with
 `--output-encoding`, for example `--output-encoding UTF-8`. This changes the
